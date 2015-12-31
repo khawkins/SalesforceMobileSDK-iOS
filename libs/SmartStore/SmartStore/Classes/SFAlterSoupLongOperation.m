@@ -28,6 +28,7 @@
 #import "SFSmartStore+Internal.h"
 #import "SFSoupIndex.h"
 #import <SalesforceSDKCore/SFJsonUtils.h>
+#import <SalesforceSDKCore/SFLogger.h>
 
 @interface SFAlterSoupLongOperation ()
 

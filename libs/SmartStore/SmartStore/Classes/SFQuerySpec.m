@@ -26,6 +26,7 @@
 #import <SalesforceSDKCore/SFJsonUtils.h>
 #import "SFSmartStore.h"
 #import <SalesforceSDKCore/NSDictionary+SFAdditions.h>
+#import <SalesforceSDKCore/SFLogger.h>
 
 NSString * const kQuerySpecSortOrderAscending = @"ascending";
 NSString * const kQuerySpecSortOrderDescending = @"descending";

@@ -26,6 +26,7 @@
 
 #import "SFSmartStore.h"
 #import "SFQuerySpec.h"
+#import <SalesforceSDKCore/SFLogger.h>
 
 @interface SFStoreCursor ()
 

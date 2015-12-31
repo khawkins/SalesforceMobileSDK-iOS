@@ -31,6 +31,7 @@
 #import <SalesforceSDKCore/SFUserAccountManager.h>
 #import <SalesforceSDKCore/SFUserAccount.h>
 #import <SalesforceSDKCore/SFDirectoryManager.h>
+#import <SalesforceSDKCore/SFLogger.h>
 #import <fmdb/FMDatabase.h>
 #import <fmdb/FMDatabaseQueue.h>
 #import <fmdb/FMResultSet.h>
