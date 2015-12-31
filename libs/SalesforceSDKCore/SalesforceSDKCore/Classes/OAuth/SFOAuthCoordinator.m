@@ -29,6 +29,7 @@
 #import "SFOAuthOrgAuthConfiguration.h"
 #import "SFSDKCryptoUtils.h"
 #import "NSData+SFSDKUtils.h"
+#import "SFLogger.h"
 
 // Public constants
 

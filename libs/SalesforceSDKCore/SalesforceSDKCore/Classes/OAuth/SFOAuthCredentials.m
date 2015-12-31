@@ -23,6 +23,7 @@
  */
 
 #import "SFOAuthCredentials+Internal.h"
+#import "SFLogger.h"
 
 static NSString * const kSFOAuthArchiveVersion         = @"1.0.3"; // internal version included when archiving via encodeWithCoder
 

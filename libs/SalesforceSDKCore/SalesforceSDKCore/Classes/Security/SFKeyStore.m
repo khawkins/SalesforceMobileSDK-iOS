@@ -26,6 +26,7 @@
 #import "SFCrypto.h"
 #import "SFKeychainItemWrapper.h"
 #import "SFSDKCryptoUtils.h"
+#import "SFLogger.h"
 
 @implementation SFKeyStore
 

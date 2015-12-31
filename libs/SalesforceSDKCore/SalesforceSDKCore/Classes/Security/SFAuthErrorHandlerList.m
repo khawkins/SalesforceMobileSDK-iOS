@@ -25,6 +25,7 @@
 
 #import "SFAuthErrorHandlerList.h"
 #import "SFAuthErrorHandler.h"
+#import "SFLogger.h"
 
 @interface SFAuthErrorHandlerList ()
 

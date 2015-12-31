@@ -26,6 +26,7 @@
 #import "TestSetupUtils.h"
 #import "SFAuthenticationManager.h"
 #import "SFUserAccountManager.h"
+#import "SFLogger.h"
 
 
 NSString* const kTestRequestStatusWaiting = @"waiting";

@@ -37,6 +37,7 @@
 #import "NSString+SFAdditions.h"
 #import "SFSDKDatasharingHelper.h"
 #import "SFFileProtectionHelper.h"
+#import "SFLogger.h"
 
 // Notifications
 NSString * const SFUserAccountManagerDidChangeCurrentUserNotification   = @"SFUserAccountManagerDidChangeCurrentUserNotification";

@@ -23,6 +23,7 @@
  */
 
 #import "SFJsonUtils.h"
+#import "SFLogger.h"
 
 static NSError *sLastError = nil;
 

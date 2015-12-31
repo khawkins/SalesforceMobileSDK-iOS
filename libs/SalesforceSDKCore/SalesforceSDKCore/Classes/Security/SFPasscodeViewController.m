@@ -28,6 +28,7 @@
 #import "SFPasscodeViewController.h"
 #import "SFPasscodeManager.h"
 #import "SFSDKResourceUtils.h"
+#import "SFLogger.h"
 
 // Private view layout constants
 

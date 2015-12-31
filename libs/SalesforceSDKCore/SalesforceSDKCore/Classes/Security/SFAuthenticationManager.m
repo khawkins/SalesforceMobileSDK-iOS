@@ -48,6 +48,8 @@
 #import "NSURL+SFAdditions.h"
 #import "SFInactivityTimerCenter.h"
 #import "SFTestContext.h"
+#import "SalesforceSDKConstants.h"
+#import "SFLogger.h"
 
 static SFAuthenticationManager *sharedInstance = nil;
 

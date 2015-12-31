@@ -23,6 +23,7 @@
  */
 
 #import "SFAuthorizingViewController.h"
+#import "SFLogger.h"
 
 
 @implementation SFAuthorizingViewController

@@ -24,6 +24,7 @@
 
 #import "SFOAuthSessionRefresher+Internal.h"
 #import "SFOAuthCredentials.h"
+#import "SFLogger.h"
 
 @implementation SFOAuthSessionRefresher
 

@@ -25,6 +25,7 @@
 
 #import <CommonCrypto/CommonCryptor.h>
 #import "SFOAuthCrypto.h"
+#import "SFLogger.h"
 
 static const CCAlgorithm    kCryptoAlgorithm    = kCCAlgorithmAES128;
 static const size_t         kCryptoBlockSize    = kCCBlockSizeAES128;

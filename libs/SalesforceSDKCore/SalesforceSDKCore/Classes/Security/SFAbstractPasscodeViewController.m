@@ -28,6 +28,7 @@
 #import "SFPasscodeManager.h"
 #import "SFPasscodeManager+Internal.h"
 #import "SFInactivityTimerCenter.h"
+#import "SFLogger.h"
 #import <LocalAuthentication/LocalAuthentication.h>
 
 // Public constants

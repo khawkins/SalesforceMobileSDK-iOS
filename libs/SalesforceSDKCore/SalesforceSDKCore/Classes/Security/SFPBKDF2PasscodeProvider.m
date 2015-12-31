@@ -27,6 +27,7 @@
 #import "SFPBKDFData.h"
 #import "SFSDKCryptoUtils.h"
 #import "NSData+SFAdditions.h"
+#import "SFLogger.h"
 
 static NSString * const kKeychainIdentifierPasscodeVerify = @"com.salesforce.security.passcode.pbkdf2.verify";
 static NSString * const kKeychainIdentifierPasscodeEncrypt = @"com.salesforce.security.passcode.pbkdf2.encrypt";

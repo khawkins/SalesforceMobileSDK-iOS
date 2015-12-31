@@ -26,6 +26,7 @@
 #import "SFPBKDFData.h"
 #import <CommonCrypto/CommonCrypto.h>
 #import "NSData+SFAdditions.h"
+#import "SFLogger.h"
 #import <Security/Security.h>
 
 // Public constants

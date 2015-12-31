@@ -23,6 +23,7 @@
  */
 
 #import "SFRootViewManager.h"
+#import "SFLogger.h"
 
 @interface SFRootViewManager()
 

@@ -26,6 +26,7 @@
 #import "SFUserAccountManager.h"
 #import "SFUserAccountIdentity.h"
 #import "SFDirectoryManager.h"
+#import "SFLogger.h"
 
 static NSString * const kPreferencesFileName = @"Preferences.plist";
 

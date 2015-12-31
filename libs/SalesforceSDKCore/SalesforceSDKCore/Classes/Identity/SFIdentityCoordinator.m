@@ -28,6 +28,7 @@
 #import "SFOAuthSessionRefresher.h"
 #import "SFIdentityData.h"
 #import "SFJsonUtils.h"
+#import "SFLogger.h"
 
 // Public constants
 
