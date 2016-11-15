@@ -87,6 +87,37 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
 
 #pragma mark - App delegate lifecycle
 
+-(BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation{
+    NSString *urlString = [url absoluteString];
+    if([urlString rangeOfString:@"restapi://magicLink?"].location == 0){
+        NSString *jwt = nil;
+        NSString *allParams = [urlString substringFromIndex:20];
+        NSArray<NSString *> *params = [allParams componentsSeparatedByString:@"&"];
+        for (NSString *param in params) {
+            NSArray<NSString *> *splits = [param componentsSeparatedByString:@"="];
+            if (splits.count == 2) {
+                if ([splits[0] isEqualToString:@"token"]) {
+                    jwt = splits[1];
+                }
+            }
+        }
+        if (jwt) {
+            SFAuthenticationManager * mgr = [SFAuthenticationManager sharedManager];
+            [mgr cancelAuthentication];
+            [mgr loginWithJwtToken:jwt completion:^(SFOAuthInfo *authInfo) {
+                [self log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
+                [SFSecurityLockout setupTimer];
+                [SFSecurityLockout startActivityMonitoring];
+                [self setupRootViewController];
+            } failure:^(SFOAuthInfo *authInfo, NSError *authError) {
+                [self log:SFLogLevelError format:@"Authentication (%@) failed: %@.", @"JWTTokenFlow", [authError localizedDescription]];
+            }];
+        }
+    }
+    return YES;
+}
+
+
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
