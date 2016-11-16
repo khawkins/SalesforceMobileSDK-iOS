@@ -39,13 +39,17 @@
 static NSString * const RemoteAccessConsumerKey = @"3MVG9Iu66FKeHhINkB1l7xt7kR8czFcCTUhgoA8Ol2Ltf1eYHOU4SqQRSEitYFDUpqRWcoQ2.dBv_a1Dyu5xa";
 static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect/oauth/done";
 
-@implementation AppDelegate
+@implementation AppDelegate {
+    bool jwtAuthenticating;
+}
 
 @synthesize window = _window;
 
 - (id)init
 {
     self = [super init];
+    jwtAuthenticating = NO;
+    
     if (self) {
         #if defined(DEBUG)
             [SFLogger sharedLogger].logLevel = SFLogLevelDebug;
@@ -55,6 +59,7 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
         [SalesforceSDKManager sharedManager].connectedAppId = RemoteAccessConsumerKey;
         [SalesforceSDKManager sharedManager].connectedAppCallbackUri = OAuthRedirectURI;
         [SalesforceSDKManager sharedManager].authScopes = @[ @"web", @"api" ];
+        [SalesforceSDKManager sharedManager].authenticateAtLaunch = NO;
         __weak typeof(self) weakSelf = self;
         [SalesforceSDKManager sharedManager].postLaunchAction = ^(SFSDKLaunchAction launchActionList) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -89,7 +94,8 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
 
 -(BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation{
     NSString *urlString = [url absoluteString];
-    if([urlString rangeOfString:@"restapi://magicLink?"].location == 0){
+    SFUserAccount *currentAccount = [SFUserAccountManager sharedInstance].currentUser;
+    if([urlString rangeOfString:@"restapi://magicLink?"].location == 0 && (currentAccount.isTemporaryUser ||currentAccount.isAnonymousUser)) {
         NSString *jwt = nil;
         NSString *allParams = [urlString substringFromIndex:20];
         NSArray<NSString *> *params = [allParams componentsSeparatedByString:@"&"];
@@ -102,15 +108,16 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
             }
         }
         if (jwt) {
+            jwtAuthenticating = YES;
             SFAuthenticationManager * mgr = [SFAuthenticationManager sharedManager];
             [mgr cancelAuthentication];
             [mgr loginWithJwtToken:jwt completion:^(SFOAuthInfo *authInfo) {
                 [self log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
-                [SFSecurityLockout setupTimer];
-                [SFSecurityLockout startActivityMonitoring];
                 [self setupRootViewController];
+                jwtAuthenticating = NO;
             } failure:^(SFOAuthInfo *authInfo, NSError *authError) {
                 [self log:SFLogLevelError format:@"Authentication (%@) failed: %@.", @"JWTTokenFlow", [authError localizedDescription]];
+                jwtAuthenticating = NO;
             }];
         }
     }
@@ -135,7 +142,11 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
     //loginViewController.navBarFont = [UIFont fontWithName:@"Helvetica" size:16.0];
     //loginViewController.navBarTextColor = [UIColor blackColor];
     //
-    [[SalesforceSDKManager sharedManager] launch];
+     
+    if (!jwtAuthenticating) {
+        [SalesforceSDKManager sharedManager].authenticateAtLaunch = YES;
+        [[SalesforceSDKManager sharedManager] launch];
+    }
     return YES;
 }
 
