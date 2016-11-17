@@ -106,19 +106,7 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
             jwt = queryStringComponents[@"token"];
         }
         if (jwt) {
-            _jwtAuthenticating = YES;
-            SFAuthenticationManager * mgr = [SFAuthenticationManager sharedManager];
-            __weak __typeof(self) weakSelf = self;
-            [mgr loginWithJwtToken:jwt completion:^(SFOAuthInfo *authInfo) {
-                __strong __typeof(self) strongSelf = weakSelf;
-                [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
-                [strongSelf setupRootViewController];
-                _jwtAuthenticating = NO;
-            } failure:^(SFOAuthInfo *authInfo, NSError *authError) {
-                __strong __typeof(self) strongSelf = weakSelf;
-                [strongSelf log:SFLogLevelError format:@"Authentication (JWTTokenFlow) failed: %@.", authError.localizedDescription];
-                _jwtAuthenticating = NO;
-            }];
+            [self startAuthentication:jwt];
         }
         return YES;
     }
@@ -154,20 +142,19 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
 {
     SFUserAccount *currentAccount = [SFUserAccountManager sharedInstance].currentUser;
     BOOL isAuthenticated = (!currentAccount.isTemporaryUser && !currentAccount.isAnonymousUser && currentAccount.credentials.refreshToken.length > 0);
-    if (!_jwtAuthenticating && !isAuthenticated) {
-        __weak __typeof(self) weakSelf = self;
-        [[SFAuthenticationManager sharedManager] loginWithCompletion:^(SFOAuthInfo * _Nonnull authInfo) {
-            __strong __typeof(self) strongSelf = weakSelf;
-            [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
-            [strongSelf setupRootViewController];
-        } failure:^(SFOAuthInfo * _Nonnull authInfo, NSError * _Nonnull authError) {
-            __strong __typeof(self) strongSelf = weakSelf;
-            [strongSelf log:SFLogLevelError format:@"Authentication (UserAgentFlow) failed: %@.", authError.localizedDescription];
-        }];
+    if (!isAuthenticated) {
+        if (!_jwtAuthenticating) {
+            [self startAuthentication:nil];
+        }
+    } else {
+        [self setupRootViewController];
     }
 }
 
-
+- (void)applicationDidEnterBackground:(UIApplication *)application
+{
+    [[SFAuthenticationManager sharedManager] cancelAuthentication];
+}
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken
 {
@@ -235,7 +222,7 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
             if ([allAccounts count] == 1) {
                 [SFUserAccountManager sharedInstance].currentUser = ([SFUserAccountManager sharedInstance].allUserAccounts)[0];
             }
-            [[SalesforceSDKManager sharedManager] launch];
+            [self startAuthentication:nil];
         }
     }];
 }
@@ -245,8 +232,36 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
     [self log:SFLogLevelInfo format:@"SFUserAccountManager changed from user %@ to %@.  Resetting app.", fromUser.userName, toUser.userName];
     [self resetViewState:^{
         [self initializeAppViewState];
-        [[SalesforceSDKManager sharedManager] launch];
+        [self startAuthentication:nil];
     }];
+}
+
+- (void)startAuthentication:(NSString *)jwtToken
+{
+    SFAuthenticationManager * mgr = [SFAuthenticationManager sharedManager];
+    __weak __typeof(self) weakSelf = self;
+    if (jwtToken.length > 0) {
+        _jwtAuthenticating = YES;
+        [mgr loginWithJwtToken:jwtToken completion:^(SFOAuthInfo * _Nonnull authInfo) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
+            [strongSelf setupRootViewController];
+            _jwtAuthenticating = NO;
+        } failure:^(SFOAuthInfo * _Nonnull authInfo, NSError * _Nonnull authError) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelError format:@"Authentication (JWTTokenFlow) failed: %@.", authError.localizedDescription];
+            _jwtAuthenticating = NO;
+        }];
+    } else {
+        [mgr loginWithCompletion:^(SFOAuthInfo * _Nonnull authInfo) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
+            [strongSelf setupRootViewController];
+        } failure:^(SFOAuthInfo * _Nonnull authInfo, NSError * _Nonnull authError) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelError format:@"Authentication (UserAgentFlow) failed: %@.", authError.localizedDescription];
+        }];
+    }
 }
 
 #pragma mark - Unit test helpers
