@@ -34,13 +34,14 @@
 #import <SalesforceSDKCore/SFLoginViewController.h>
 #import <UIKit/UIKit.h>
 #import <SalesforceSDKCore/SFAuthenticationManager.h>
+#import <SalesforceSDKCore/NSString+SFAdditions.h>
 
 // Fill these in when creating a new Connected Application on Force.com
 static NSString * const RemoteAccessConsumerKey = @"3MVG9Iu66FKeHhINkB1l7xt7kR8czFcCTUhgoA8Ol2Ltf1eYHOU4SqQRSEitYFDUpqRWcoQ2.dBv_a1Dyu5xa";
 static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect/oauth/done";
 
 @implementation AppDelegate {
-    bool jwtAuthenticating;
+    BOOL _jwtAuthenticating;
 }
 
 @synthesize window = _window;
@@ -48,7 +49,7 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
 - (id)init
 {
     self = [super init];
-    jwtAuthenticating = NO;
+    _jwtAuthenticating = NO;
     
     if (self) {
         #if defined(DEBUG)
@@ -71,7 +72,6 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
             //[[SFPushNotificationManager sharedInstance] registerForRemoteNotifications];
             //
             [strongSelf log:SFLogLevelInfo format:@"Post-launch: launch actions taken: %@", [SalesforceSDKManager launchActionsStringRepresentation:launchActionList]];
-            [strongSelf setupRootViewController];
         };
         [SalesforceSDKManager sharedManager].launchErrorAction = ^(NSError *error, SFSDKLaunchAction launchActionList) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -92,36 +92,38 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
 
 #pragma mark - App delegate lifecycle
 
--(BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation{
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation{
     NSString *urlString = [url absoluteString];
     SFUserAccount *currentAccount = [SFUserAccountManager sharedInstance].currentUser;
-    if([urlString rangeOfString:@"restapi://magicLink?"].location == 0 && (currentAccount.isTemporaryUser ||currentAccount.isAnonymousUser)) {
+    BOOL isAuthenticated = (!currentAccount.isTemporaryUser && !currentAccount.isAnonymousUser && currentAccount.credentials.refreshToken.length > 0);
+    
+    if ([urlString hasPrefix:@"restapi://magicLink?"] && !isAuthenticated) {
         NSString *jwt = nil;
-        NSString *allParams = [urlString substringFromIndex:20];
-        NSArray<NSString *> *params = [allParams componentsSeparatedByString:@"&"];
-        for (NSString *param in params) {
-            NSArray<NSString *> *splits = [param componentsSeparatedByString:@"="];
-            if (splits.count == 2) {
-                if ([splits[0] isEqualToString:@"token"]) {
-                    jwt = splits[1];
-                }
-            }
+        NSRange queryStringRange = [urlString rangeOfString:@"?"];
+        if (queryStringRange.location != NSNotFound) {
+            NSString *queryString = [urlString substringFromIndex:queryStringRange.location + 1];
+            NSDictionary *queryStringComponents = [queryString queryStringComponents];
+            jwt = queryStringComponents[@"token"];
         }
         if (jwt) {
-            jwtAuthenticating = YES;
+            _jwtAuthenticating = YES;
             SFAuthenticationManager * mgr = [SFAuthenticationManager sharedManager];
-            [mgr cancelAuthentication];
+            __weak __typeof(self) weakSelf = self;
             [mgr loginWithJwtToken:jwt completion:^(SFOAuthInfo *authInfo) {
-                [self log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
-                [self setupRootViewController];
-                jwtAuthenticating = NO;
+                __strong __typeof(self) strongSelf = weakSelf;
+                [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
+                [strongSelf setupRootViewController];
+                _jwtAuthenticating = NO;
             } failure:^(SFOAuthInfo *authInfo, NSError *authError) {
-                [self log:SFLogLevelError format:@"Authentication (%@) failed: %@.", @"JWTTokenFlow", [authError localizedDescription]];
-                jwtAuthenticating = NO;
+                __strong __typeof(self) strongSelf = weakSelf;
+                [strongSelf log:SFLogLevelError format:@"Authentication (JWTTokenFlow) failed: %@.", authError.localizedDescription];
+                _jwtAuthenticating = NO;
             }];
         }
+        return YES;
     }
-    return YES;
+    
+    return NO;
 }
 
 
@@ -142,13 +144,30 @@ static NSString * const OAuthRedirectURI        = @"testsfdc:///mobilesdk/detect
     //loginViewController.navBarFont = [UIFont fontWithName:@"Helvetica" size:16.0];
     //loginViewController.navBarTextColor = [UIColor blackColor];
     //
-     
-    if (!jwtAuthenticating) {
-        [SalesforceSDKManager sharedManager].authenticateAtLaunch = YES;
-        [[SalesforceSDKManager sharedManager] launch];
-    }
+    
+    [[SalesforceSDKManager sharedManager] launch];
+    
     return YES;
 }
+
+- (void)applicationDidBecomeActive:(UIApplication *)application
+{
+    SFUserAccount *currentAccount = [SFUserAccountManager sharedInstance].currentUser;
+    BOOL isAuthenticated = (!currentAccount.isTemporaryUser && !currentAccount.isAnonymousUser && currentAccount.credentials.refreshToken.length > 0);
+    if (!_jwtAuthenticating && !isAuthenticated) {
+        __weak __typeof(self) weakSelf = self;
+        [[SFAuthenticationManager sharedManager] loginWithCompletion:^(SFOAuthInfo * _Nonnull authInfo) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelInfo format:@"Authentication (%@) succeeded.  Launch completed.", authInfo.authTypeDescription];
+            [strongSelf setupRootViewController];
+        } failure:^(SFOAuthInfo * _Nonnull authInfo, NSError * _Nonnull authError) {
+            __strong __typeof(self) strongSelf = weakSelf;
+            [strongSelf log:SFLogLevelError format:@"Authentication (UserAgentFlow) failed: %@.", authError.localizedDescription];
+        }];
+    }
+}
+
+
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken
 {
