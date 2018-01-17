@@ -63,6 +63,7 @@ static NSString * const kSFOAuthResponseTypeCode                = @"code";
 
 static NSString * const kSFOAuthAccessToken                     = @"access_token";
 static NSString * const kSFOAuthClientId                        = @"client_id";
+static NSString * const kSFOAuthDeviceId                        = @"device_id";
 static NSString * const kSFOAuthCustomPermissions               = @"custom_permissions";
 static NSString * const kSFOAuthDisplay                         = @"display";
 static NSString * const kSFOAuthDisplayTouch                    = @"touch";
@@ -121,6 +122,7 @@ static NSString * const kHttpPostContentType                    = @"application/
 static NSString * const kHttpHeaderUserAgent                    = @"User-Agent";
 static NSString * const kOAuthUserAgentUserDefaultsKey          = @"UserAgent";
 static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
+static NSString * const kSFECParameter = @"ec";
 
 @implementation SFOAuthCoordinator
 
@@ -617,7 +619,7 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
         NSString *baseUrlString = [self.credentials.apiUrl absoluteString];
         NSString *approvalUrlString = [self generateCodeApprovalUrlString:spAppCredentials];
         NSString *codeChallengeString = spAppCredentials.challengeString;
-        approvalUrlString = [NSString stringWithFormat:@"%@&%@=%@&prompt=consent",approvalUrlString,kSFOAuthCodeChallengeParamName,codeChallengeString];
+        approvalUrlString = [NSString stringWithFormat:@"%@&%@=%@", approvalUrlString, kSFOAuthCodeChallengeParamName, codeChallengeString];
         NSString *escapedApprovalUrlString = [approvalUrlString stringByURLEncoding];
         NSString *frontDoorUrlString = [NSString stringWithFormat:@"%@/secur/frontdoor.jsp?sid=%@&retURL=%@", baseUrlString, self.credentials.accessToken, escapedApprovalUrlString];
         [self loadWebViewWithUrlString:frontDoorUrlString cookie:YES];
@@ -654,10 +656,11 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
     }
     [request setHTTPShouldHandleCookies:NO];
     
-    NSMutableString *params = [[NSMutableString alloc] initWithFormat:@"%@=%@&%@=%@&%@=%@",
+    NSMutableString *params = [[NSMutableString alloc] initWithFormat:@"%@=%@&%@=%@&%@=%@&%@=%@",
                                kSFOAuthFormat, kSFOAuthFormatJson,
                                kSFOAuthRedirectUri, self.credentials.redirectUri,
-                               kSFOAuthClientId, self.credentials.clientId];
+                               kSFOAuthClientId, self.credentials.clientId,
+                               kSFOAuthDeviceId,[[[UIDevice currentDevice] identifierForVendor] UUIDString]];
     NSMutableString *logString = [NSMutableString stringWithString:params];
     
     // If there is an approval code (Advanced Auth flow), use it once to get the tokens.
@@ -758,45 +761,50 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
     }
 }
 
+- (NSError *)checkFrontdoorResponseForErrors:(NSURL *)requestUrl {
+    NSError *error = nil;
+    NSString *ecValue = [requestUrl valueForParameterName:kSFECParameter];
+    BOOL foundValidEcValue = ([ecValue isEqualToString:@"301"] || [ecValue isEqualToString:@"302"]);
+    NSString *errorCode = [requestUrl valueForParameterName:kSFOAuthError];
+    NSString *errorDescription = [requestUrl valueForParameterName:kSFOAuthErrorDescription];
+    if (foundValidEcValue) {
+        [SFSDKCoreLogger d:[self class] format:@"%@ IDP Authcode redirect response encountered an ec=301 or 302 redirect: %@", NSStringFromSelector(_cmd), requestUrl];
+        error = [[self class] errorWithType:kSFOAuthErrorTypeMalformedResponse description:@"IDP Authcode redirect response encountered an ec=301 or 302 redirect"];
+    } else if (errorCode) {
+        error = [[self class] errorWithType:errorCode
+                                description:errorDescription];
+    } else if (![requestUrl fragment] && ![requestUrl query]){
+        [SFSDKCoreLogger d:[self class] format:@"%@ Error: IDP Authcode response has no payload: %@", NSStringFromSelector(_cmd), requestUrl];
+        error = [[self class] errorWithType:kSFOAuthErrorTypeMalformedResponse description:@"IDP Authcode redirect response has no payload"];
+    }
+    return error;
+}
 
 - (void)handleIDPAuthCodeResponse:(NSURL *)requestUrl {
     NSString *response = nil;
-    if ([requestUrl fragment]) {
-        response = [requestUrl fragment];
-    } else if ([requestUrl query]) {
-        response = [requestUrl query];
-    } else {
-        [SFSDKCoreLogger d:[self class] format:@"%@ Error: IDP Authcode response has no payload: %@", NSStringFromSelector(_cmd), requestUrl];
-        NSError *error = [[self class] errorWithType:kSFOAuthErrorTypeMalformedResponse description:@"IDP Authcode redirect response has no payload"];
-        [self notifyDelegateOfFailure:error authInfo:self.authInfo];
-        response = nil;
-    }
-    
-    if (response) {
-        NSDictionary *params = [[self class] parseQueryString:response decodeParams:NO];
-        NSString *error = params[kSFOAuthError];
-        if (nil == error) {
-            self.spAppCredentials.authCode = params[kSFOAuthApprovalCode];
-            if ([self.delegate respondsToSelector:@selector(oauthCoordinatorDidFetchAuthCode:authInfo:)]) {
-                [self.delegate oauthCoordinatorDidFetchAuthCode:self authInfo:self.authInfo];
-            }
+    NSError *error = [self checkFrontdoorResponseForErrors:requestUrl];
+    // all error cases should be handled by the above call
+    if (error) {
+        NSError *finalError;
+        // add any additional relevant info to the userInfo dictionary
+        if (kSFOAuthErrorInvalidClientId == error.code) {
+            NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:error.userInfo];
+            dict[kSFOAuthClientId] = self.credentials.clientId;
+            finalError = [NSError errorWithDomain:error.domain code:error.code userInfo:dict];
         } else {
-            NSError *finalError;
-            NSError *error = [[self class] errorWithType:params[kSFOAuthError]
-                                             description:params[kSFOAuthErrorDescription]];
-            
-            // add any additional relevant info to the userInfo dictionary
-            if (kSFOAuthErrorInvalidClientId == error.code) {
-                NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:error.userInfo];
-                dict[kSFOAuthClientId] = self.credentials.clientId;
-                finalError = [NSError errorWithDomain:error.domain code:error.code userInfo:dict];
-            } else {
-                finalError = error;
-            }
-            [self notifyDelegateOfFailure:finalError authInfo:self.authInfo];
+            finalError = error;
         }
+        [self notifyDelegateOfFailure:finalError authInfo:self.authInfo];
+    } else {
+        // Should have a valid reponse here.Must be a fragment or query. No Errors in response,no ec=*
+        response = [requestUrl fragment]?:[requestUrl query];
+        NSDictionary *params = [[self class] parseQueryString:response decodeParams:NO];
+        self.spAppCredentials.authCode = params[kSFOAuthApprovalCode];
+        if ([self.delegate respondsToSelector:@selector(oauthCoordinatorDidFetchAuthCode:authInfo:)]) {
+            [self.delegate oauthCoordinatorDidFetchAuthCode:self authInfo:self.authInfo];
+        }
+        
     }
-    
 }
 
 - (void)handleUserAgentResponse:(NSURL *)requestUrl {
@@ -846,11 +854,12 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
     NSAssert(nil != credentials.domain, @"credentials.domain is required");
     NSAssert(nil != credentials.clientId, @"credentials.clientId is required");
     NSAssert(nil != credentials.redirectUri, @"credentials.redirectUri is required");
-    NSMutableString *approvalUrlString = [[NSMutableString alloc] initWithFormat:@"%@://%@%@?%@=%@&%@=%@&%@=%@", credentials.protocol,
+    NSMutableString *approvalUrlString = [[NSMutableString alloc] initWithFormat:@"%@://%@%@?%@=%@&%@=%@&%@=%@&%@=%@", credentials.protocol,
                                           credentials.domain, [self brandedAuthorizeURL],
                                           kSFOAuthClientId, credentials.clientId,
                                           kSFOAuthRedirectUri, credentials.redirectUri,
-                                          kSFOAuthDisplay, kSFOAuthDisplayTouch];
+                                          kSFOAuthDisplay, kSFOAuthDisplayTouch,
+                                          kSFOAuthDeviceId,[[[UIDevice currentDevice] identifierForVendor] UUIDString]];
     
     [approvalUrlString appendFormat:@"&%@=%@", kSFOAuthResponseType, kSFOAuthResponseTypeToken];
     NSString *scopeString = [self scopeQueryParamString];
@@ -864,14 +873,15 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
     NSAssert(nil != self.credentials.domain, @"credentials.domain is required");
     NSAssert(nil != spAppCredentials.clientId, @"credentials.clientId is required");
     NSAssert(nil != spAppCredentials.redirectUri, @"credentials.redirectUri is required");
-    NSMutableString *approvalUrlString = [[NSMutableString alloc] initWithFormat:@"%@://%@%@?%@=%@&%@=%@&%@=%@&%@=%@",
+    NSMutableString *approvalUrlString = [[NSMutableString alloc] initWithFormat:@"%@://%@%@?%@=%@&%@=%@&%@=%@&%@=%@&%@=%@",
                                           @"https",
                                           self.credentials.domain,
                                           kSFOAuthEndPointAuthorize,
                                           kSFOAuthClientId,spAppCredentials.clientId,
                                           kSFOAuthRedirectUri,spAppCredentials.redirectUri,
                                           kSFOAuthDisplay,kSFOAuthDisplayTouch,
-                                          kSFOAuthResponseType,kSFOAuthResponseTypeCode];
+                                          kSFOAuthResponseType,kSFOAuthResponseTypeCode,
+                                          kSFOAuthDeviceId,[[[UIDevice currentDevice] identifierForVendor] UUIDString]];
     
     NSString *scopeString = [self scopeQueryParamString];
     if (scopeString != nil) {
@@ -1060,7 +1070,6 @@ static NSString * const kSFAppFeatureSafariBrowserForLogin      = @"BW";
     
     NSURL *requestUrl = [webView URL];
     NSString *errorUrlString = [NSString stringWithFormat:@"%@://%@%@", [requestUrl scheme], [requestUrl host], [requestUrl relativePath]];
-    [self.delegate oauthCoordinator:self didBeginAuthenticationWithView:self.view];
     if (-999 == error.code) {
         // -999 errors (operation couldn't be completed) occur during normal execution, therefore only log for debugging
         [SFSDKCoreLogger d:[self class] format:@"SFOAuthCoordinator:didFailLoadWithError: error code: %ld, description: %@, URL: %@", (long)error.code, [error localizedDescription], errorUrlString];

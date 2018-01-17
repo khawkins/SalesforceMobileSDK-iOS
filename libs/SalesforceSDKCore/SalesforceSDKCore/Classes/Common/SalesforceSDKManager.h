@@ -36,7 +36,8 @@ typedef UIViewController * __nullable (^SFSnapshotViewControllerCreationBlock)(v
 typedef NS_ENUM(NSUInteger, SFAppType) {
     kSFAppTypeNative,
     kSFAppTypeHybrid,
-    kSFAppTypeReactNative
+    kSFAppTypeReactNative,
+    kSFAppTypeNativeSwift
 };
 
 NS_ASSUME_NONNULL_BEGIN
@@ -45,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 static NSString * const kSFMobileSDKNativeDesignator = @"Native";
 static NSString * const kSFMobileSDKHybridDesignator = @"Hybrid";
 static NSString * const kSFMobileSDKReactNativeDesignator = @"ReactNative";
+static NSString * const kSFMobileSDKNativeSwiftDesignator = @"NativeSwift";
 
 /**
  Block typedef for presenting the snapshot view controller.
@@ -247,13 +249,9 @@ typedef void (^SFSnapshotViewControllerDismissalBlock)(UIViewController* snapsho
  */
 @property (nonatomic,assign) BOOL isIdentityProvider;
 
-/** Use this flag to indicate if the APP supports using an identity provider app for authentication
- */
-@property (nonatomic,assign) BOOL idpEnabled;
-
 /** Use this flag to indicate if the scheme for the identity provider app
  */
-@property (nonatomic, copy) NSString *idpAppScheme;
+@property (nonatomic, copy) NSString *idpAppURIScheme;
 
 /** Use this flag to setup a user friendly display name  for your current app. This value will be used by the identity
  *  provider app on the user selection view.

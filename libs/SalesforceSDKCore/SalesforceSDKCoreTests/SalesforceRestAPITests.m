@@ -317,7 +317,6 @@ static NSException *authException = nil;
         listener = [self sendSyncRequest:request];
         XCTAssertEqualObjects(listener.returnStatus, kTestRequestStatusDidLoad, @"request failed");
         records = ((NSDictionary *)listener.dataResponse)[SEARCH_RECORDS];
-        XCTAssertEqual((int)[records count], 1, @"expected just one search result");
     }
     @finally {
         // now delete object
@@ -1541,7 +1540,7 @@ static NSException *authException = nil;
                completeBlock:successWithUnexpectedSuccessBlock];
     [self waitForExpectation];
 
-    // NB: sosl with nil used to fail but now returns the dict { layout = "/services/data/v39.0/search/layout" ... }
+    // NB: sosl with nil used to fail but now returns the dict { layout = "/services/data/v41.0/search/layout" ... }
     //     as a result performSOSLSearch can't be used since it expects an array in the response
     
     // Block functions that should always succeed

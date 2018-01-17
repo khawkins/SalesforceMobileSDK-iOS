@@ -28,7 +28,7 @@
 #import "SFUserAccountConstants.h"
 #import "SFOAuthCoordinator.h"
 #import "SFOAuthCoordinator.h"
-
+#import "SFSDKLoginViewControllerConfig.h"
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -114,6 +114,10 @@ FOUNDATION_EXTERN NSString * const kSFNotificationUserDidLogout;
  */
 FOUNDATION_EXTERN NSString * const kSFNotificationUserWillShowAuthView;
 
+/** Notification sent when user cancels authentication
+ */
+FOUNDATION_EXTERN NSString * const kSFNotificationUserCanceledAuth;
+
 /** Notification sent prior to user log in
  */
 FOUNDATION_EXTERN NSString * const kSFNotificationUserWillLogIn;
@@ -125,6 +129,10 @@ FOUNDATION_EXTERN NSString * const kSFNotificationUserDidLogIn;
 /**  Notification sent before SP APP invokes IDP APP for authentication
  */
 FOUNDATION_EXTERN NSString * const kSFNotificationUserWillSendIDPRequest;
+
+/**  Notification sent before IDP APP invokes SP APP with auth code
+ */
+FOUNDATION_EXTERN NSString * const kSFNotificationUserWillSendIDPResponse;
 
 /**  Notification sent when  IDP APP receives request for authentication from SP APP
  */
@@ -162,6 +170,7 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
 @class SFUserAccountManager;
 @class SFSDKAlertMessage;
 @class SFSDKWindowContainer;
+@class SFSDKAuthViewHandler;
 
 /**
  Protocol for handling callbacks from SFUserAccountManager.
@@ -287,7 +296,7 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
  value is determined by the SFDCOAuthClientIdPreference
  configured via the settings bundle.
  */
-@property (nonatomic, copy, nullable) NSString *oauthClientId;
+@property (nonatomic, copy) NSString *oauthClientId;
 
 /** OAuth callback url to use for the OAuth login process.
  Apps may customize this by setting this property before login.
@@ -295,7 +304,7 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
  bundle property SFDCOAuthRedirectUri
  default: @"sfdc:///axm/detect/oauth/done")
  */
-@property (nonatomic, copy, nullable) NSString *oauthCompletionUrl;
+@property (nonatomic, copy) NSString *oauthCompletionUrl;
 
 /**
  The Branded Login path configured for this application.
@@ -329,7 +338,7 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
 /**  Use this property to enable this app to be able to use another app that is an Identity Provider
  *
  */
-@property (nonatomic,assign) BOOL idpEnabled;
+@property (nonatomic,assign, readonly) BOOL idpEnabled;
 
 /** Use this property to use SFAuthenticationManager for authentication
  *
@@ -339,7 +348,7 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
 /** Use this property to indicate the url scheme  for the Identity Provider app
  *
  */
-@property (nonatomic, copy) NSString *idpAppScheme;
+@property (nonatomic, copy) NSString *idpAppURIScheme;
 
 /** Use this property to indicate to provide a user-friendly name for your app. This name will be displayed
  *  in the user selection view of the identity provider app.
@@ -347,7 +356,10 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
  */
 @property (nonatomic,copy) NSString *appDisplayName;
 
-
+/** Use this property to indicate to provide LoginViewController customizations for themes,navbar and settigs icon.
+ *
+ */
+@property (nonatomic,strong) SFSDKLoginViewControllerConfig *loginViewControllerConfig;
 
 /** Shared singleton
  */
@@ -577,9 +589,19 @@ FOUNDATION_EXTERN NSString * const kSFUserInfoAddlOptionsKey;
 - (BOOL)handleAdvancedAuthenticationResponse:(NSURL *)appUrlResponse options:(NSDictionary *)options;
 
 /**
- Change this block to handle all alerts  required by the SFUSerAccountManager.
+ Set this block to handle presentation of the Authentication View Controller.
+ */
+@property (nonatomic, strong) SFSDKAuthViewHandler *authViewHandler;
+
+/**
+ Change this block to handle all alerts  required by the SFUserAccountManager.
  */
 @property (nonatomic, copy, nonnull) void (^alertDisplayBlock)(SFSDKAlertMessage *,SFSDKWindowContainer *);
+
+/**
+ Change this block to customize behavior for user initiated auth cancellation
+ */
+@property (nonatomic, copy, nonnull) void (^authCancelledByUserHandlerBlock)(void);
 
 /**
  Determines whether an error is due to invalid auth credentials.

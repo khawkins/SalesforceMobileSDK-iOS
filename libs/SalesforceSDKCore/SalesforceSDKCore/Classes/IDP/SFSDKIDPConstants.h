@@ -75,6 +75,8 @@ FOUNDATION_EXPORT NSString *const kSFAppDescParam;
 
 FOUNDATION_EXPORT NSString *const kSFScopesParam;
 
+FOUNDATION_EXPORT NSString *const kSFStartURLParam;
+
 @interface SFSDKIDPConstants : NSObject
 
 @end

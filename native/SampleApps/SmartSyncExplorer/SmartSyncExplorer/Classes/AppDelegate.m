@@ -30,12 +30,14 @@
 #import <SalesforceSDKCore/SalesforceSDKManager.h>
 #import <SalesforceSDKCore/SFUserAccountManager.h>
 #import <SalesforceSDKCore/SFSDKAppConfig.h>
+#import <SalesforceSDKcore/SFSDKWindowManager.h>
 #import <SmartSync/SmartSyncSDKManager.h>
 #import <SalesforceAnalytics/SFSDKDatasharingHelper.h>
 #import <SalesforceAnalytics/NSUserDefaults+SFAdditions.h>
 #import <SmartSyncExplorerCommon/SmartSyncExplorerConfig.h>
 #import "IDPLoginNavViewController.h"
-@interface AppDelegate ()
+
+@interface AppDelegate () <SalesforceSDKManagerDelegate>
 
 /**
  * Convenience method for setting up the main UIViewController and setting self.window's rootViewController
@@ -62,20 +64,21 @@
         SmartSyncExplorerConfig *config = [SmartSyncExplorerConfig sharedInstance];
         [SFSDKDatasharingHelper sharedInstance].appGroupName = config.appGroupName;
         [SFSDKDatasharingHelper sharedInstance].appGroupEnabled = config.appGroupsEnabled;
-        [SalesforceSDKManager setInstanceClass:[SmartSyncSDKManager class]];
         
-        // Need to use SmartStoreSDKManager when using smartstore
+        // Need to use SmartSyncSDKManager when using SmartSync
         [SalesforceSDKManager setInstanceClass:[SmartSyncSDKManager class]];
         [SalesforceSDKManager sharedManager].appConfig.remoteAccessConsumerKey = config.remoteAccessConsumerKey;
         [SalesforceSDKManager sharedManager].appConfig.oauthRedirectURI = config.oauthRedirectURI;
         [SalesforceSDKManager sharedManager].appConfig.oauthScopes = [NSSet setWithArray:config.oauthScopes];
+        
         __weak typeof(self) weakSelf = self;
+        
+        [[SalesforceSDKManager sharedManager] addDelegate:self];
         
         //Uncomment following block to enable IDP Login flow.
         /*
-        [SalesforceSDKManager sharedManager].idpEnabled = YES;
-         //scheme of idpAppp
-        [SalesforceSDKManager sharedManager].idpAppScheme = @"sampleidpapp";
+        //scheme of idpAppp
+        [SalesforceSDKManager sharedManager].idpAppURIScheme = @"sampleidpapp";
          //user friendly display name
         [SalesforceSDKManager sharedManager].appDisplayName = @"SampleAppOne";
          
@@ -158,7 +161,8 @@
     /*
     return [[SFUserAccountManager sharedInstance] handleAdvancedAuthenticationResponse:url options:options];
     */
-   return NO;
+    return NO;
+
 }
 
 #pragma mark - Private methods
@@ -228,4 +232,10 @@
     }];
 }
 
+- (void)sdkManagerWillResignActive {
+    if ([SalesforceSDKManager sharedManager].useSnapshotView) {
+        // Remove the keyboard if it is showing..
+        [[SFSDKWindowManager sharedManager].activeWindow.window endEditing:YES];
+    }
+}
 @end

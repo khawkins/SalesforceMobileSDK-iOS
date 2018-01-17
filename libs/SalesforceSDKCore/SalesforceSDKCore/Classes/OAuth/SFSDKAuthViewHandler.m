@@ -1,8 +1,8 @@
 /*
- IDPLoginViewController.m
+ SFSDKOAuthViewHandler.m
  SalesforceSDKCore
  
- Created by Raj Rao on 9/28/17.
+ Created by Raj Rao on 7/25/17.
  
  Copyright (c) 2017-present, salesforce.com, inc. All rights reserved.
  
@@ -26,38 +26,17 @@
  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#import "IDPLoginViewController.h"
-
-@interface IDPLoginViewController ()
-- (IBAction)loginIDPAction:(id)sender;
-- (IBAction)loginLocalAction:(id)sender;
-
+#import "SFSDKAuthViewHandler.h"
+@implementation SFSDKAuthViewHolder
 @end
-
-@implementation IDPLoginViewController
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    // Do any additional setup after loading the view from its nib.
-    [self setTitle:@"Log In"];
-    
-    self.navigationController.navigationBar.titleTextAttributes = @{NSForegroundColorAttributeName:[UIColor whiteColor]};
-    self.navigationController.navigationBar.barTintColor = [UIColor colorWithRed:0 green:0.439 blue:0.824 alpha:1.0];
-}
-
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-}
-
-- (IBAction)loginIDPAction:(id)sender {
-    if ([self.loginSelectionDelegate respondsToSelector:@selector(loginUsingIDP)]) {
-        [self.loginSelectionDelegate loginUsingIDP];
+@implementation SFSDKAuthViewHandler
+- (id)initWithDisplayBlock:(SFSDKAuthViewDisplayBlock)authViewDisplayBlock  dismissBlock:(SFSDKAuthViewDismissBlock)dismissBlock {
+    self = [super init];
+    if (self) {
+        self.authViewDisplayBlock = authViewDisplayBlock ;
+        self.authViewDismissBlock = dismissBlock;
     }
+    return self;
 }
 
-- (IBAction)loginLocalAction:(id)sender {
-    if ([self.loginSelectionDelegate respondsToSelector:@selector(loginUsingApp)]) {
-        [self.loginSelectionDelegate loginUsingApp];
-    }
-}
 @end

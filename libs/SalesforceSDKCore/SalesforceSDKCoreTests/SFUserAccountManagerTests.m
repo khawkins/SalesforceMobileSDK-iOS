@@ -25,8 +25,12 @@
 #import <XCTest/XCTest.h>
 #import <OCMock/OCMock.h>
 #import <SalesforceSDKCore/SalesforceSDKCore.h>
+#import "SFSDKAuthViewHandler.h"
 #import "SFUserAccountManager+Internal.h"
 #import "SFDefaultUserAccountPersister.h"
+#import "SFSDKOAuthClient.h"
+#import "SFSDKOAuthClientConfig.h"
+
 static NSString * const kUserIdFormatString = @"005R0000000Dsl%lu";
 static NSString * const kOrgIdFormatString = @"00D000000000062EA%lu";
 
@@ -97,6 +101,8 @@ static NSString * const kOrgIdFormatString = @"00D000000000062EA%lu";
 @interface SFUserAccountManagerTests : XCTestCase
 
 @property (nonatomic, strong) SFUserAccountManager *uam;
+@property (nonatomic, strong) SFSDKAuthViewHandler *authViewHandler;
+@property (nonatomic, strong) SFSDKLoginViewControllerConfig *config;
 
 - (SFUserAccount *)createNewUserWithIndex:(NSUInteger)index;
 - (NSArray *)createAndVerifyUserAccounts:(NSUInteger)numAccounts;
@@ -106,7 +112,7 @@ static NSString * const kOrgIdFormatString = @"00D000000000062EA%lu";
 @implementation SFUserAccountManagerTests
 
 - (void)setUp {
-
+    [super setUp];
     // Delete the content of the global library directory
     NSString *globalLibraryDirectory = [[SFDirectoryManager sharedManager] directoryForUser:nil type:NSLibraryDirectory components:nil];
     [[[NSFileManager alloc] init] removeItemAtPath:globalLibraryDirectory error:nil];
@@ -124,8 +130,16 @@ static NSString * const kOrgIdFormatString = @"00D000000000062EA%lu";
     }
     [self.uam clearAllAccountState];
     self.uam.currentUser = nil;
-    [super setUp];
+    self.authViewHandler = [SFUserAccountManager sharedInstance].authViewHandler;
+    self.config = self.uam.loginViewControllerConfig;
 }
+
+- (void)tearDown {
+    [SFUserAccountManager sharedInstance].authViewHandler = self.authViewHandler;
+    self.uam.loginViewControllerConfig = self.config;
+    [super tearDown];
+}
+
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnonnull"
@@ -475,6 +489,91 @@ static NSString * const kOrgIdFormatString = @"00D000000000062EA%lu";
     [observerMock verify];
     
     [[NSNotificationCenter defaultCenter] removeObserver:observerMock];
+}
+
+- (void)testAuthHandler {
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"testAuthHandler"];
+    SFSDKAuthViewHandler *authViewHandler = [[SFSDKAuthViewHandler alloc] initWithDisplayBlock:^(SFSDKAuthViewHolder *holder) {
+        [expectation fulfill];
+    } dismissBlock:^{
+        [expectation fulfill];
+    }];
+    [[SFUserAccountManager sharedInstance] setAuthViewHandler:authViewHandler];
+    XCTAssertNotNil(authViewHandler);
+    XCTAssertNotNil(authViewHandler.authViewDismissBlock);
+    XCTAssertNotNil(authViewHandler.authViewDisplayBlock);
+    XCTAssertTrue([SFUserAccountManager sharedInstance].authViewHandler == authViewHandler);
+    
+    SFOAuthCredentials *credentials = [self populateAuthCredentialsFromConfigFileForClass:self.class];
+    credentials.refreshToken = nil;
+    SFSDKOAuthClient *client = [[SFUserAccountManager sharedInstance] fetchOAuthClient:credentials completion:nil failure:nil];
+    [client refreshCredentials];
+    [self waitForExpectations:[NSArray arrayWithObject:expectation] timeout:20];
+    [[SFUserAccountManager sharedInstance] disposeOAuthClient:client];
+}
+
+- (void)testLoginViewControllerCustomizations {
+    
+    SFSDKLoginViewControllerConfig *config = [[SFSDKLoginViewControllerConfig alloc] init];
+    
+    //test defaults
+    XCTAssertNotNil(config);
+    XCTAssertNil(config.navBarFont);
+    XCTAssertNotNil(config.navBarColor);
+    XCTAssertTrue(config.showNavbar == YES);
+    XCTAssertTrue(config.showSettingsIcon == YES);
+    
+    config.navBarColor = [UIColor redColor];
+    config.navBarFont = [UIFont systemFontOfSize:10.0f];
+    config.showNavbar = NO;
+    config.showSettingsIcon = NO;
+    
+    XCTAssertTrue(config.navBarColor == [UIColor redColor], @"SFSDKLoginViewController config nav bar color should have changed" );
+    XCTAssertTrue(config.navBarFont == [UIFont systemFontOfSize:10.0f], @"SFSDKLoginViewController config nav bar font should have changed" );
+    XCTAssertFalse(config.showNavbar, @"SFSDKLoginViewController nav bar should have been disabled");
+    XCTAssertFalse(config.showSettingsIcon, @"SFSDKLoginViewController nav bar settings icon should have been disabled");
+    
+    [SFUserAccountManager sharedInstance].loginViewControllerConfig = config;
+    
+    SFOAuthCredentials *credentials = [self populateAuthCredentialsFromConfigFileForClass:self.class];
+    credentials.refreshToken = nil;
+    
+    SFSDKOAuthClient *client = [[SFUserAccountManager sharedInstance] fetchOAuthClient:credentials completion:nil failure:nil];
+    XCTAssertTrue(client.config.loginViewControllerConfig == config);
+    [[SFUserAccountManager sharedInstance] disposeOAuthClient:client];
+}
+
+- (void)testLoginViewCustomizationsBackwardCompatibility {
+    
+    SFLoginViewController *controller = [SFLoginViewController sharedInstance];
+    SFSDKLoginViewControllerConfig *origConfig = controller.config;
+    
+    controller.navBarColor = [UIColor redColor];
+    controller.navBarFont = [UIFont systemFontOfSize:10.0f];
+    controller.showNavbar = YES;
+    controller.showSettingsIcon = NO;
+    
+    
+    SFSDKLoginViewControllerConfig *config = controller.config;
+    
+    //test defaults
+    XCTAssertNotNil(config);
+   
+    XCTAssertTrue(config.navBarColor == [UIColor redColor], @"SFSDKLoginViewController config nav bar color should have changed" );
+    XCTAssertTrue(config.navBarFont == [UIFont systemFontOfSize:10.0f], @"SFSDKLoginViewController config nav bar font should have changed" );
+    XCTAssertTrue(config.showNavbar, @"SFSDKLoginViewController nav bar should have been disabled");
+    XCTAssertFalse(config.showSettingsIcon, @"SFSDKLoginViewController nav bar settings icon should have been disabled");
+    
+    [SFUserAccountManager sharedInstance].loginViewControllerConfig = config;
+    
+    SFOAuthCredentials *credentials = [self populateAuthCredentialsFromConfigFileForClass:self.class];
+    credentials.refreshToken = nil;
+    
+    SFSDKOAuthClient *client = [[SFUserAccountManager sharedInstance] fetchOAuthClient:credentials completion:nil failure:nil];
+    XCTAssertTrue(client.config.loginViewControllerConfig == config);
+    [[SFUserAccountManager sharedInstance] disposeOAuthClient:client];
+    controller.config = origConfig;
 }
 
 #pragma mark - Helper methods
